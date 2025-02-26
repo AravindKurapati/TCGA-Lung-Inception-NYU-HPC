@@ -26,7 +26,7 @@ parser.add_argument('--hpc_ids_csv', type=str, required=True, help='Path to the 
 args = parser.parse_args()
 tf.keras.backend.set_image_data_format('channels_last')
 
-# Load Data from HDF5
+#loading data from HDF5
 def load_hdf5_data(hdf5_path, img_key, slide_key, tile_key):
     with h5py.File(hdf5_path, 'r') as h5_file:
         images = np.array(h5_file[img_key])
@@ -36,7 +36,7 @@ def load_hdf5_data(hdf5_path, img_key, slide_key, tile_key):
 
 
 
-# Load test data
+#loading test data
 test_images, test_slides, test_tiles = load_hdf5_data(args.test_hdf5, 'img_z_latent', 'slides', 'tiles')
 test_images = test_images / 255.0  
 
@@ -49,7 +49,7 @@ def get_patient_id(slide_id):
 
 
 
-# Load patient labels
+#patient labels
 def load_patient_labels(label_file):
     patient_to_label = {}
     with open(label_file, 'r') as file:
@@ -59,11 +59,11 @@ def load_patient_labels(label_file):
     print("Loaded patient labels. Sample data:", list(patient_to_label.items())[:15])
     return patient_to_label
 
-# Get labels for slides
+#getting labels for slides
 patient_to_label = load_patient_labels(args.labels_txt)
 
 
-# Get labels for slides with debugging
+#labels for slides with debug
 def get_labels_for_slides(slides, patient_to_label):
     labels = []
     unmapped_ids = []  
@@ -87,7 +87,7 @@ def get_labels_for_slides(slides, patient_to_label):
 
 
 
-# Debugging mapping of patient IDs to labels
+#mapping of patient IDs to labels
 def map_patient_labels(slides, labels):
     patient_to_label_map = {}
     print("Starting to map patient IDs to labels...")
@@ -105,45 +105,45 @@ def map_patient_labels(slides, labels):
     return patient_to_label_map
 
 
-# Generate slide labels directly from test_slides
+#generating slide labels directly from test_slides
 slide_labels = get_labels_for_slides(test_slides, patient_to_label)
 
-# Generate the patient_to_label_map using all test slides and their labels
+#generating the patient_to_label_map using all test slides and their labels
 patient_to_label_map = map_patient_labels(test_slides, slide_labels)
 
-# Generate patient IDs and their labels
+#generating patient IDs and their labels
 unique_patient_ids = np.array(list(patient_to_label_map.keys()))
 patient_labels = np.array(list(patient_to_label_map.values()))
 
-# Split dataset by patient
+#split dataset by patient
 train_patient_ids, temp_patient_ids, train_patient_labels, temp_patient_labels = train_test_split(
     unique_patient_ids, patient_labels, test_size=0.4, random_state=42, stratify=patient_labels)
 
 valid_patient_ids, test_patient_ids, valid_patient_labels, test_patient_labels = train_test_split(
     temp_patient_ids, temp_patient_labels, test_size=0.5, random_state=42, stratify=temp_patient_labels)
 
-# Apply train, validation, and test masks directly on test_slides
+#applying train, validation, and test masks directly on test_slides
 train_mask = np.isin([get_patient_id(slide.decode("utf-8")) for slide in test_slides], train_patient_ids)
 valid_mask = np.isin([get_patient_id(slide.decode("utf-8")) for slide in test_slides], valid_patient_ids)
 test_mask = np.isin([get_patient_id(slide.decode("utf-8")) for slide in test_slides], test_patient_ids)
 
-# Filter data using masks
+#filtering data using masks
 train_images, train_slides, train_tiles = test_images[train_mask], test_slides[train_mask], test_tiles[train_mask]
 valid_images, valid_slides, valid_tiles = test_images[valid_mask], test_slides[valid_mask], test_tiles[valid_mask]
 test_images, test_slides, test_tiles = test_images[test_mask], test_slides[test_mask], test_tiles[test_mask]
 
-# Confirm the split and get labels for unique slides in each dataset
+#unique slides in each dataset
 train_unique_slides = np.unique(train_slides)
 valid_unique_slides = np.unique(valid_slides)
 test_unique_slides = np.unique(test_slides)
 
-# Get labels for unique slides
+#labels for unique slides
 train_labels = np.array([patient_to_label_map[get_patient_id(slide.decode("utf-8"))] for slide in train_unique_slides])
 valid_labels = np.array([patient_to_label_map[get_patient_id(slide.decode("utf-8"))] for slide in valid_unique_slides])
 test_labels = np.array([patient_to_label_map[get_patient_id(slide.decode("utf-8"))] for slide in test_unique_slides])
 
 
-# Load data from TFRecords
+#data from TFRecords
 def create_tfrecord_dataset(tfrecord_path, batch_size, is_training=True):
     def parse_example(example_proto):
         features = {
@@ -166,7 +166,7 @@ def create_tfrecord_dataset(tfrecord_path, batch_size, is_training=True):
 
 
 
-# Function to extract x, y coordinates from tile string
+#extract x and y coordinates from tile string
 def extract_coordinates(tile_str):
     tile_str = tile_str.decode("utf-8")  
     tile_str = tile_str.replace('.jpeg', '').replace('.jpg', '')  
@@ -193,8 +193,6 @@ valid_reconstructed = reconstruct_images(valid_images, valid_slides, valid_tiles
 test_reconstructed = reconstruct_images(test_images, test_slides, test_tiles, img_size, channels)
 
 
-
-# Data augmentation
 data_augmentation = tf.keras.Sequential([
     layers.RandomFlip('horizontal_and_vertical'),
     layers.RandomRotation(0.2),
@@ -203,8 +201,7 @@ data_augmentation = tf.keras.Sequential([
 ])
 
     
-    
-# TFRecord helper functions
+
 def _bytes_feature(value):
     if isinstance(value, type(tf.constant(0))):
         value = value.numpy()
@@ -233,7 +230,6 @@ def write_tfrecords(filename, images, labels):
 
 
     
-# TFRecord paths
 train_tfrecord_path = os.path.join(args.model_dir, 'train_data.tfrecord')
 valid_tfrecord_path = os.path.join(args.model_dir, 'valid_data.tfrecord')
 
@@ -243,8 +239,6 @@ write_tfrecords(valid_tfrecord_path, valid_reconstructed, valid_labels[:len(vali
     
 train_dataset = create_tfrecord_dataset(train_tfrecord_path, args.batch_size, is_training=True)
 valid_dataset = create_tfrecord_dataset(valid_tfrecord_path, args.batch_size, is_training=False)
-
-
 
 
 
@@ -259,264 +253,225 @@ def create_original_inception_model(input_shape=(224, 224, 128)):
     
     return models.Model(inputs=base_model.input, outputs=outputs)
 
-# Compile and train model
 model = create_original_inception_model((args.img_size, args.img_size, 128))
 model.compile(optimizer=optimizers.SGD(learning_rate=0.01, momentum=0.9, nesterov=True),
               loss=losses.BinaryCrossentropy(), metrics=['accuracy'])
-# model.summary()
+model.summary()
 
 
 
 
-# Debugging data splitting
-def debug_splits(train_ids, val_ids, test_ids):
-    print(f"Train IDs (Sample): {train_ids[:5]}")
-    print(f"Validation IDs (Sample): {val_ids[:5]}")
-    print(f"Test IDs (Sample): {test_ids[:5]}")
-    print(f"Overlap between Train and Validation: {set(train_ids) & set(val_ids)}")
-    print(f"Overlap between Validation and Test: {set(val_ids) & set(test_ids)}")
-    print(f"Overlap between Train and Test: {set(train_ids) & set(test_ids)}")
+# def debug_splits(train_ids, val_ids, test_ids):
+#     print(f"Train IDs (Sample): {train_ids[:5]}")
+#     print(f"Validation IDs (Sample): {val_ids[:5]}")
+#     print(f"Test IDs (Sample): {test_ids[:5]}")
+#     print(f"Overlap between Train and Validation: {set(train_ids) & set(val_ids)}")
+#     print(f"Overlap between Validation and Test: {set(val_ids) & set(test_ids)}")
+#     print(f"Overlap between Train and Test: {set(train_ids) & set(test_ids)}")
     
     
-# Debugging masks and filtered data
-def debug_masks(slides, train_mask, val_mask, test_mask):
-    print(f"Train Mask sum: {np.sum(train_mask)}")
-    print(f"Validation Mask sum: {np.sum(val_mask)}")
-    print(f"Test Mask sum: {np.sum(test_mask)}")
-    print(f"Sample Train Slides: {slides[train_mask][:5]}")
-    print(f"Sample Validation Slides: {slides[val_mask][:5]}")
-    print(f"Sample Test Slides: {slides[test_mask][:5]}")
+# def debug_masks(slides, train_mask, val_mask, test_mask):
+#     print(f"Train Mask sum: {np.sum(train_mask)}")
+#     print(f"Validation Mask sum: {np.sum(val_mask)}")
+#     print(f"Test Mask sum: {np.sum(test_mask)}")
+#     print(f"Sample Train Slides: {slides[train_mask][:5]}")
+#     print(f"Sample Validation Slides: {slides[val_mask][:5]}")
+#     print(f"Sample Test Slides: {slides[test_mask][:5]}")
     
     
-# Debugging reconstructed image shapes
-def debug_reconstructed_images(train_rec, valid_rec, test_rec):
-    print(f"Train reconstructed shape: {train_rec.shape}")
-    print(f"Validation reconstructed shape: {valid_rec.shape}")
-    print(f"Test reconstructed shape: {test_rec.shape}")
+# # Debugging reconstructed image shapes
+# def debug_reconstructed_images(train_rec, valid_rec, test_rec):
+#     print(f"Train reconstructed shape: {train_rec.shape}")
+#     print(f"Validation reconstructed shape: {valid_rec.shape}")
+#     print(f"Test reconstructed shape: {test_rec.shape}")
     
     
-# Saving TFRecords with debugging
-def write_tfrecords(filename, images, labels):
-    with tf.io.TFRecordWriter(filename) as writer:
-        for i, (image, label) in enumerate(zip(images, labels)):
-            augmented_img = data_augmentation(tf.expand_dims(image, axis=0))
-            tf_example = serialize_example(augmented_img[0], label)
-            writer.write(tf_example)
-            if i < 5:  
-                print(f"Written record {i+1}: Label = {label}")
-    print(f"TFRecord file saved at: {filename}")
+# def write_tfrecords(filename, images, labels):
+#     with tf.io.TFRecordWriter(filename) as writer:
+#         for i, (image, label) in enumerate(zip(images, labels)):
+#             augmented_img = data_augmentation(tf.expand_dims(image, axis=0))
+#             tf_example = serialize_example(augmented_img[0], label)
+#             writer.write(tf_example)
+#             if i < 5:  
+#                 print(f"Written record {i+1}: Label = {label}")
+#     print(f"TFRecord file saved at: {filename}")
 
     
 
-    # Check label sets for each patient
-print("\n--- Checking Label Sets for Each Patient ---")
-for patient_id in patient_to_label_map.keys():
-    patient_labels = set(
-        [label for slide, label in zip(test_slides, slide_labels) 
-         if get_patient_id(slide.decode("utf-8")) == patient_id]
-    )
-    print(f"Patient ID: {patient_id}, Labels: {patient_labels}")
+# print("\n Checking Label Sets for Each Patient ")
+# for patient_id in patient_to_label_map.keys():
+#     patient_labels = set(
+#         [label for slide, label in zip(test_slides, slide_labels) 
+#          if get_patient_id(slide.decode("utf-8")) == patient_id]
+#     )
+#     print(f"Patient ID: {patient_id}, Labels: {patient_labels}")
 
 
-for slide in test_slides[:10]:  
-    slide_id = slide.decode("utf-8")[:12]
-    print(f"Slide ID: {slide.decode('utf-8')}, Extracted Patient ID: {slide_id}")
+# for slide in test_slides[:10]:  
+#     slide_id = slide.decode("utf-8")[:12]
+#     print(f"Slide ID: {slide.decode('utf-8')}, Extracted Patient ID: {slide_id}")
 
 
-with open(args.labels_txt, 'r') as file:
-    labels_data = [line.strip().split()[0][:12] for line in file]
-print("Sample Patient IDs from labels_txt:", labels_data[:10])
+# with open(args.labels_txt, 'r') as file:
+#     labels_data = [line.strip().split()[0][:12] for line in file]
+# print("Sample Patient IDs from labels_txt:", labels_data[:10])
 
 
-patient_id_cleaned = slide_id.strip()
+# patient_id_cleaned = slide_id.strip()
 
-# Extract patient IDs from test slides
-test_patient_ids = {get_patient_id(slide.decode("utf-8")) for slide in test_slides}
+# # Extract patient IDs from test slides
+# test_patient_ids = {get_patient_id(slide.decode("utf-8")) for slide in test_slides}
 
-# Extract patient IDs from labels_txt
-label_patient_ids = set(patient_to_label.keys())
+# # Extract patient IDs from labels_txt
+# label_patient_ids = set(patient_to_label.keys())
 
-missing_patient_ids = test_patient_ids - label_patient_ids
+# missing_patient_ids = test_patient_ids - label_patient_ids
 
-print(f"Patient IDs in test slides but missing in labels_txt: {missing_patient_ids}")
-print(f"Number of missing IDs: {len(missing_patient_ids)}")
-
-
-print(f"Train labels distribution: {np.unique(train_patient_labels, return_counts=True)}")
-print(f"Validation labels distribution: {np.unique(valid_patient_labels, return_counts=True)}")
-print(f"Test labels distribution: {np.unique(test_patient_labels, return_counts=True)}")
+# print(f"Patient IDs in test slides but missing in labels_txt: {missing_patient_ids}")
+# print(f"Number of missing IDs: {len(missing_patient_ids)}")
 
 
-
-unique_patient_ids = [get_patient_id(slide.decode("utf-8")) for slide in test_slides]
-unique_labels = [patient_to_label_map.get(pid, 'Unknown') for pid in unique_patient_ids]
-print(f"Label distribution in test HDF5: {pd.Series(unique_labels).value_counts()}")
-
-
-train_patient_ids, _, train_patient_labels, _ = train_test_split(unique_patient_ids, unique_labels, test_size=0.4, random_state=42, stratify=unique_labels)
-print("Train set label distribution:", pd.Series(train_patient_labels).value_counts())
-
-h5_patient_ids = set([get_patient_id(slide.decode("utf-8")) for slide in test_slides])
-txt_patient_ids = set(patient_to_label.keys())
-missing_in_labels_txt = h5_patient_ids - txt_patient_ids
-print("Patient IDs in HDF5 but missing from labels_txt:", missing_in_labels_txt)
-
-import matplotlib.pyplot as plt
-
-def load_mask(mask_dir, slide_id):
-    """
-    Load the mask image for a given slide ID.
-    """
-    mask_path = f"{mask_dir}/{slide_id}_mask.png"
-    if not os.path.exists(mask_path):
-        raise FileNotFoundError(f"Mask not found for slide ID {slide_id} at {mask_path}")
-    return plt.imread(mask_path)
-
-# Directory for mask images
-mask_dir = "mask_images"
-
-# Load and verify masks for all slides
-available_masks = [f for f in os.listdir(mask_dir) if f.endswith('_mask.png')]
-print("Sample test slides:", [slide.decode("utf-8") for slide in test_slides[:10]])
-print("Sample available masks:", available_masks[:10])
+# print(f"Train labels distribution: {np.unique(train_patient_labels, return_counts=True)}")
+# print(f"Validation labels distribution: {np.unique(valid_patient_labels, return_counts=True)}")
+# print(f"Test labels distribution: {np.unique(test_patient_labels, return_counts=True)}")
 
 
-# Validate if all test slides have corresponding masks
-unmatched_slides = [slide.decode("utf-8") for slide in test_slides if f"{slide.decode('utf-8')}_mask.png" not in available_masks]
-print("Unmatched Slide IDs:", unmatched_slides[:10])  # Display a sample
-print(f"Total unmatched slides: {len(unmatched_slides)}")
+
+# unique_patient_ids = [get_patient_id(slide.decode("utf-8")) for slide in test_slides]
+# unique_labels = [patient_to_label_map.get(pid, 'Unknown') for pid in unique_patient_ids]
+# print(f"Label distribution in test HDF5: {pd.Series(unique_labels).value_counts()}")
 
 
-from sklearn.cluster import DBSCAN
-import numpy as np
+# train_patient_ids, _, train_patient_labels, _ = train_test_split(unique_patient_ids, unique_labels, test_size=0.4, random_state=42, stratify=unique_labels)
+# print("Train set label distribution:", pd.Series(train_patient_labels).value_counts())
 
-def extract_coordinates_from_mask(mask):
-    """
-    Extract coordinates of non-zero regions from a mask.
-    """
-    coordinates = np.column_stack(np.nonzero(mask))
-    return coordinates
-
-def cluster_coordinates(coordinates, eps=5, min_samples=10):
-    """
-    Cluster the tile coordinates using DBSCAN.
-    """
-    clustering = DBSCAN(eps=eps, min_samples=min_samples).fit(coordinates)
-    return clustering.labels_
-
-# Example: Process a single slide
-slide_id = "TCGA-33-4532-01Z-00-DX1"  # Example slide ID
-mask = load_mask(mask_dir, slide_id)
-coordinates = extract_coordinates_from_mask(mask)
-cluster_labels = cluster_coordinates(coordinates)
-
-print(f"Clusters for slide {slide_id}: {np.unique(cluster_labels)}")
+# h5_patient_ids = set([get_patient_id(slide.decode("utf-8")) for slide in test_slides])
+# txt_patient_ids = set(patient_to_label.keys())
+# missing_in_labels_txt = h5_patient_ids - txt_patient_ids
+# print("Patient IDs in HDF5 but missing from labels_txt:", missing_in_labels_txt)
 
 
-def save_clusters_visualization(coordinates, labels, slide_id, output_dir="cluster_visualizations"):
-    """
-    Save the visualization of clusters on the mask image as a file.
+# def load_mask(mask_dir, slide_id):
+#     mask_path = f"{mask_dir}/{slide_id}_mask.png"
+#     if not os.path.exists(mask_path):
+#         raise FileNotFoundError(f"Mask not found for slide ID {slide_id} at {mask_path}")
+#     return plt.imread(mask_path)
+
+# mask_dir = "mask_images"
+
+# available_masks = [f for f in os.listdir(mask_dir) if f.endswith('_mask.png')]
+# print("Sample test slides:", [slide.decode("utf-8") for slide in test_slides[:10]])
+# print("Sample available masks:", available_masks[:10])
+
+
+#validate if all test slides have corresponding masks
+# unmatched_slides = [slide.decode("utf-8") for slide in test_slides if f"{slide.decode('utf-8')}_mask.png" not in available_masks]
+# print("Unmatched Slide IDs:", unmatched_slides[:10])  # Display a sample
+# print(f"Total unmatched slides: {len(unmatched_slides)}")
+
+
+# from sklearn.cluster import DBSCAN
+
+# def extract_coordinates_from_mask(mask):
+#     coordinates = np.column_stack(np.nonzero(mask))
+#     return coordinates
+
+# def cluster_coordinates(coordinates, eps=5, min_samples=10):
+#     clustering = DBSCAN(eps=eps, min_samples=min_samples).fit(coordinates)
+#     return clustering.labels_
+
+# slide_id = "TCGA-33-4532-01Z-00-DX1"  
+# mask = load_mask(mask_dir, slide_id)
+# coordinates = extract_coordinates_from_mask(mask)
+# cluster_labels = cluster_coordinates(coordinates)
+
+# print(f"Clusters for slide {slide_id}: {np.unique(cluster_labels)}")
+
+
+# def save_clusters_visualization(coordinates, labels, slide_id, output_dir="cluster_visualizations"):
+#     if not os.path.exists(output_dir):
+#         os.makedirs(output_dir)
+
+#     plt.figure(figsize=(10, 10))
+#     scatter = plt.scatter(coordinates[:, 1], coordinates[:, 0], c=labels, cmap='tab20', s=5)
+#     plt.title(f"HPC Clusters for Slide {slide_id}")
+#     plt.gca().invert_yaxis()
+#     plt.colorbar(scatter, label="Cluster ID")
     
-    Args:
-        coordinates (numpy.ndarray): Coordinates of the tiles.
-        labels (numpy.ndarray): Cluster labels for the coordinates.
-        slide_id (str): ID of the slide being processed.
-        output_dir (str): Directory to save the output images.
-    """
-    # Ensure the output directory exists
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    
-    # Create the plot
-    plt.figure(figsize=(10, 10))
-    scatter = plt.scatter(coordinates[:, 1], coordinates[:, 0], c=labels, cmap='tab20', s=5)
-    plt.title(f"HPC Clusters for Slide {slide_id}")
-    plt.gca().invert_yaxis()
-    plt.colorbar(scatter, label="Cluster ID")
-    
-    # Save the plot
-    output_path = os.path.join(output_dir, f"{slide_id}_clusters.png")
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    plt.close()  # Close the plot to free memory
-    print(f"Cluster visualization saved for {slide_id} at {output_path}")
-
-# Example Usage
-slide_id = "TCGA-33-4532-01Z-00-DX1"  # Example slide ID
-mask = load_mask(mask_dir, slide_id)
-coordinates = extract_coordinates_from_mask(mask)
-cluster_labels = cluster_coordinates(coordinates)
-
-# Save the visualization as an image
-save_clusters_visualization(coordinates, cluster_labels, slide_id)
+#     output_path = os.path.join(output_dir, f"{slide_id}_clusters.png")
+#     plt.savefig(output_path, dpi=300, bbox_inches='tight')
+#     plt.close()  # Close the plot to free memory
+#     print(f"Cluster visualization saved for {slide_id} at {output_path}")
 
 
-for slide in test_slides:
-    slide_id = slide.decode("utf-8")[:12]
-    try:
-        mask = load_mask(mask_dir, slide_id)
-        coordinates = extract_coordinates_from_mask(mask)
-        cluster_labels = cluster_coordinates(coordinates)
-        save_clusters_visualization(coordinates, cluster_labels, slide_id)
-    except FileNotFoundError as e:
-        print(e)
+# slide_id = "TCGA-33-4532-01Z-00-DX1"  
+# mask = load_mask(mask_dir, slide_id)
+# coordinates = extract_coordinates_from_mask(mask)
+# cluster_labels = cluster_coordinates(coordinates)
+# save_clusters_visualization(coordinates, cluster_labels, slide_id)
 
 
+# for slide in test_slides:
+#     slide_id = slide.decode("utf-8")[:12]
+#     try:
+#         mask = load_mask(mask_dir, slide_id)
+#         coordinates = extract_coordinates_from_mask(mask)
+#         cluster_labels = cluster_coordinates(coordinates)
+#         save_clusters_visualization(coordinates, cluster_labels, slide_id)
+#     except FileNotFoundError as e:
+#         print(e)
 
-# # Initialize lists to save training and validation losses
-# train_loss_results = []
-# valid_loss_results = []
 
-# # Training loop with early stopping
-# early_stopping = callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
-# steps_per_epoch = len(train_reconstructed) // args.batch_size
-# validation_steps = len(valid_reconstructed) // args.batch_size
+train_loss_results = []
+valid_loss_results = []
 
-# history = model.fit(
-#     train_dataset, 
-#     epochs=args.epochs, 
-#     steps_per_epoch=steps_per_epoch,
-#     validation_data=valid_dataset, 
-#     validation_steps=validation_steps, 
-#     callbacks=[early_stopping]
-# )
+early_stopping = callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+steps_per_epoch = len(train_reconstructed) // args.batch_size
+validation_steps = len(valid_reconstructed) // args.batch_size
+
+history = model.fit(
+    train_dataset, 
+    epochs=args.epochs, 
+    steps_per_epoch=steps_per_epoch,
+    validation_data=valid_dataset, 
+    validation_steps=validation_steps, 
+    callbacks=[early_stopping]
+)
 
     
     
+
+for epoch in range(len(history.history['loss'])):
+    train_loss_results.append(history.history['loss'][epoch])
+    valid_loss_results.append(history.history['val_loss'][epoch])
+
+losses_df = pd.DataFrame({
+    'epoch': range(1, len(train_loss_results) + 1),
+    'train_loss': train_loss_results,
+    'valid_loss': valid_loss_results
+})
     
-# # Save training and validation losses
-# for epoch in range(len(history.history['loss'])):
-#     train_loss_results.append(history.history['loss'][epoch])
-#     valid_loss_results.append(history.history['val_loss'][epoch])
-
-# losses_df = pd.DataFrame({
-#     'epoch': range(1, len(train_loss_results) + 1),
-#     'train_loss': train_loss_results,
-#     'valid_loss': valid_loss_results
-# })
     
-    
-# losses_csv_path = os.path.join(args.model_dir, 'training_validation_losses.csv')
-# losses_df.to_csv(losses_csv_path, index=False)
-# print(f"Training and validation losses saved at {losses_csv_path}")
+losses_csv_path = os.path.join(args.model_dir, 'training_validation_losses.csv')
+losses_df.to_csv(losses_csv_path, index=False)
+print(f"Training and validation losses saved at {losses_csv_path}")
 
 
-# # Calculate ROC AUC if classes are balanced
-# if len(np.unique(valid_labels)) > 1:
-#     valid_predictions = model.predict(valid_reconstructed).ravel()
-#     valid_auc = roc_auc_score(valid_labels, valid_predictions)
-#     print(f"Validation AUC: {valid_auc}")
-# else:
-#     print("Validation labels contain only one class, skipping ROC AUC calculation.")
+if len(np.unique(valid_labels)) > 1:
+    valid_predictions = model.predict(valid_reconstructed).ravel()
+    valid_auc = roc_auc_score(valid_labels, valid_predictions)
+    print(f"Validation AUC: {valid_auc}")
+else:
+    print("Validation labels contain only one class, skipping ROC AUC calculation.")
 
-# if len(np.unique(test_labels)) > 1:
-#     test_predictions = model.predict(test_reconstructed).ravel()
-#     test_auc = roc_auc_score(test_labels, test_predictions)
-#     print(f"Test AUC: {test_auc}")
-# else:
-#     print("Test labels contain only one class, skipping ROC AUC calculation.")
+if len(np.unique(test_labels)) > 1:
+    test_predictions = model.predict(test_reconstructed).ravel()
+    test_auc = roc_auc_score(test_labels, test_predictions)
+    print(f"Test AUC: {test_auc}")
+else:
+    print("Test labels contain only one class, skipping ROC AUC calculation.")
 
-# # Save the model
-# model_save_path = os.path.join(args.model_dir, 'trained_model.h5')
-# model.save(model_save_path)
-# print(f"Trained model saved at: {model_save_path}")
+model_save_path = os.path.join(args.model_dir, 'trained_model.h5')
+model.save(model_save_path)
+print(f"Trained model saved at: {model_save_path}")
 
