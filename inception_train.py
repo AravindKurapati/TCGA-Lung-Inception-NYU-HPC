@@ -8,6 +8,13 @@ from tensorflow.keras import layers, models, optimizers, losses, callbacks
 from tensorflow.keras.applications import InceptionV3
 from sklearn.linear_model import LogisticRegression
 import tensorflow as tf
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import OneHotEncoder
+import torch
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
+from barlow_twins_module import BarlowTwins, ResNetBackbone
+import torchvision.transforms.functional as TF
 import matplotlib
 matplotlib.use('Agg')
 import os
@@ -228,8 +235,82 @@ def write_tfrecords(filename, images, labels):
             writer.write(tf_example)
     print(f"TFRecord file saved at: {filename}")
 
+def extract_patch_embeddings(images, embedding_dim=128):
+    return np.random.rand(images.shape[0], embedding_dim).astype(np.float32)
 
-    
+train_patch_embeddings = extract_patch_embeddings(train_reconstructed)
+valid_patch_embeddings = extract_patch_embeddings(valid_reconstructed)
+test_patch_embeddings = extract_patch_embeddings(test_reconstructed)
+
+class TileDataset(Dataset):
+    def __init__(self, tiles, transform=None):
+        self.tiles = tiles
+        self.transform = transform
+
+    def __getitem__(self, idx):
+        tile = self.tiles[idx]
+        x1 = self.transform(tile)
+        x2 = self.transform(tile)
+        return x1, x2
+
+    def __len__(self):
+        return len(self.tiles)
+barlow_transform = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.RandomResizedCrop(224),
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomVerticalFlip(),
+    transforms.ToTensor(),
+])
+
+
+def train_barlow_twins(tiles_np, batch_size=64, epochs=10, device='cuda'):
+    # Convert NumPy array to torch dataset
+    dataset = TileDataset(tiles_np, transform=barlow_transform)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+    # Initialize model
+    backbone = ResNetBackbone().to(device)
+    model = BarlowTwins(backbone).to(device)
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+    model.train()
+    for epoch in range(epochs):
+        epoch_loss = 0.0
+        for x1, x2 in dataloader:
+            x1, x2 = x1.to(device), x2.to(device)
+            loss = model(x1, x2)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            epoch_loss += loss.item()
+
+        print(f"Epoch {epoch+1}/{epochs} - Loss: {epoch_loss / len(dataloader):.4f}")
+
+    return backbone
+
+def extract_representations(backbone, tiles_np, batch_size=64, device='cuda'):
+    backbone.eval()
+    transform = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.Resize((224, 224)),
+        transforms.ToTensor()
+    ])
+
+    embeddings = []
+    with torch.no_grad():
+        for i in range(0, len(tiles_np), batch_size):
+            batch = [transform(img) for img in tiles_np[i:i+batch_size]]
+            batch = torch.stack(batch).to(device)
+            emb = backbone(batch).cpu().numpy()
+            embeddings.append(emb)
+
+    return np.vstack(embeddings)
+bt_backbone = train_barlow_twins(train_reconstructed, epochs=10, device=device)
+
+train_embeddings = extract_representations(bt_backbone, train_reconstructed, device=device)
+
 train_tfrecord_path = os.path.join(args.model_dir, 'train_data.tfrecord')
 valid_tfrecord_path = os.path.join(args.model_dir, 'valid_data.tfrecord')
 
@@ -261,50 +342,11 @@ model.summary()
 
 
 
-# def debug_splits(train_ids, val_ids, test_ids):
-#     print(f"Train IDs (Sample): {train_ids[:5]}")
-#     print(f"Validation IDs (Sample): {val_ids[:5]}")
-#     print(f"Test IDs (Sample): {test_ids[:5]}")
-#     print(f"Overlap between Train and Validation: {set(train_ids) & set(val_ids)}")
-#     print(f"Overlap between Validation and Test: {set(val_ids) & set(test_ids)}")
-#     print(f"Overlap between Train and Test: {set(train_ids) & set(test_ids)}")
-    
-    
-# def debug_masks(slides, train_mask, val_mask, test_mask):
-#     print(f"Train Mask sum: {np.sum(train_mask)}")
-#     print(f"Validation Mask sum: {np.sum(val_mask)}")
-#     print(f"Test Mask sum: {np.sum(test_mask)}")
-#     print(f"Sample Train Slides: {slides[train_mask][:5]}")
-#     print(f"Sample Validation Slides: {slides[val_mask][:5]}")
-#     print(f"Sample Test Slides: {slides[test_mask][:5]}")
-    
-    
-# # Debugging reconstructed image shapes
-# def debug_reconstructed_images(train_rec, valid_rec, test_rec):
-#     print(f"Train reconstructed shape: {train_rec.shape}")
-#     print(f"Validation reconstructed shape: {valid_rec.shape}")
-#     print(f"Test reconstructed shape: {test_rec.shape}")
-    
-    
-# def write_tfrecords(filename, images, labels):
-#     with tf.io.TFRecordWriter(filename) as writer:
-#         for i, (image, label) in enumerate(zip(images, labels)):
-#             augmented_img = data_augmentation(tf.expand_dims(image, axis=0))
-#             tf_example = serialize_example(augmented_img[0], label)
-#             writer.write(tf_example)
-#             if i < 5:  
-#                 print(f"Written record {i+1}: Label = {label}")
-#     print(f"TFRecord file saved at: {filename}")
 
-    
 
-# print("\n Checking Label Sets for Each Patient ")
-# for patient_id in patient_to_label_map.keys():
-#     patient_labels = set(
-#         [label for slide, label in zip(test_slides, slide_labels) 
-#          if get_patient_id(slide.decode("utf-8")) == patient_id]
-#     )
-#     print(f"Patient ID: {patient_id}, Labels: {patient_labels}")
+
+
+
 
 
 # for slide in test_slides[:10]:  
@@ -462,14 +504,14 @@ if len(np.unique(valid_labels)) > 1:
     valid_auc = roc_auc_score(valid_labels, valid_predictions)
     print(f"Validation AUC: {valid_auc}")
 else:
-    print("Validation labels contain only one class, skipping ROC AUC calculation.")
+    print("Validation labels contain only one class")
 
 if len(np.unique(test_labels)) > 1:
     test_predictions = model.predict(test_reconstructed).ravel()
     test_auc = roc_auc_score(test_labels, test_predictions)
     print(f"Test AUC: {test_auc}")
 else:
-    print("Test labels contain only one class, skipping ROC AUC calculation.")
+    print("Test labels contain only one class")
 
 model_save_path = os.path.join(args.model_dir, 'trained_model.h5')
 model.save(model_save_path)
