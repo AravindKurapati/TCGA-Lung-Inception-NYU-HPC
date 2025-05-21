@@ -53,8 +53,41 @@ We use the **TCGA lung cancer dataset**, which includes:
 
 ---
 
-## **Installation**
-To install dependencies:
-```bash
-pip install tensorflow torch torchvision torchaudio 
-pip install scikit-learn pandas numpy tqdm biopython h5py matplotlib
+### 📸 Visualizations
+
+#### 🔹 Clustered Patches – Training  
+<img src="images/cluster_13_train.jpg" width="450"/>
+
+Clusters identified from training tiles using DBSCAN. These clusters highlight high-density regions in the tissue, such as tumor cores or lymphocyte aggregates.
+
+---
+
+#### 🔹 Clustered Patches – Testing  
+<img src="images/cluster_46_test.jpg" width="450"/>
+
+Testing slide cluster visualizations used to evaluate how the model generalizes across patient samples.
+
+---
+
+#### 🔹 Cluster Heatmaps (Test Samples)  
+<img src="images/cluster_11_test.jpg" width="400"/>  
+<img src="images/cluster_19_test.jpg" width="400"/>
+
+Two test samples showing spatial grouping of histological tiles. These clusters can be used to correlate with morphology or subtype-specific patterns.
+
+---
+
+#### 🔹 Slide-Level Patch Mask  
+<img src="images/TCGA-33-4532-01Z-00-DX1_mask.png" width="450"/>
+
+Binary mask showing regions of interest extracted from a whole-slide image. This helps isolate cancerous regions from background tissue.
+
+---
+
+#### 🔹 Transformed Region (Data Augmentation Preview)  
+<img src="images/transformed_1.png" width="400"/>
+
+Example of a tile after applying augmentation such as flipping, random rotation, and contrast adjustment — part of the TFRecord preprocessing pipeline.
+
+---
+
