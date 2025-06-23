@@ -207,7 +207,7 @@ Model performance shows reasonable classification accuracy but limited discrimin
 
 ## Visual Examples
 
-![image](https://github.com/user-attachments/assets/68c02f27-ed2a-4b67-95ca-1928c808ffb0)
+![transformed_1](https://github.com/user-attachments/assets/d94675b9-2972-46f0-8011-9d070ffe1d2c)
 
 
 ![image](https://github.com/user-attachments/assets/78159674-d593-4560-a988-06878975ae30)
@@ -216,3 +216,13 @@ Model performance shows reasonable classification accuracy but limited discrimin
 ![image](https://github.com/user-attachments/assets/a48cb556-8a26-4b04-b3e6-8e89c2f079e2)
 
 ![image](https://github.com/user-attachments/assets/c73b1e1a-ff37-4650-b525-be5b674652b3)
+
+
+![TCGA-33-4532-01Z-00-DX1_mask](https://github.com/user-attachments/assets/5659c94e-e475-46b0-8d15-e18e501f89af)
+
+
+![cluster_13_train](https://github.com/user-attachments/assets/4f03045c-a59c-47ee-8a7e-1ecba9514724)
+
+
+
+
