@@ -1,0 +1,51 @@
+# Training Configuration
+
+# Data paths
+data:
+  hdf5_path: "data/tcga_lung.h5"
+  labels_path: "data/labels.txt"
+  hpc_ids_csv: "data/hpc_ids.csv"
+
+# Model parameters
+model:
+  name: "InceptionV3"
+  input_shape: [224, 224, 128]
+  dropout: 0.5
+  dense_units: 512
+
+# Training parameters
+training:
+  epochs: 90
+  batch_size: 32
+  learning_rate: 0.01
+  momentum: 0.9
+  early_stopping_patience: 10
+
+# SSL parameters (Barlow Twins)
+ssl:
+  enabled: false
+  epochs: 10
+  batch_size: 64
+  projection_dim: 2048
+  lambda_param: 0.005
+
+# Data splitting
+splitting:
+  test_size: 0.4
+  val_size: 0.5
+  random_state: 42
+
+# Directories
+directories:
+  model_dir: "models/"
+  checkpoint_dir: "checkpoints/"
+  logs_dir: "logs/"
+  visualizations_dir: "visualizations/"
+
+# Augmentation
+augmentation:
+  horizontal_flip: true
+  vertical_flip: true
+  rotation: 0.2
+  translation: 0.1
+  contrast: 0.2
