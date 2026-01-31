@@ -225,38 +225,3 @@ Model performance shows reasonable classification accuracy but limited discrimin
 
 
 
- ##Repository Structure & File Guide
-
-tcga-lung-classification/
-├── data/                          # Data loading and preprocessing modules
-│   ├── __init__.py               # Package initialization with imports
-│   ├── data_loader.py            # HDF5 file I/O, patient ID extraction, label mapping
-│   ├── preprocessing.py          # Tile reconstruction, coordinate parsing, augmentation
-│   └── tfrecord_utils.py         # TFRecord serialization and dataset creation
-│
-├── models/                        # Neural network architectures
-│   ├── __init__.py               # Model package exports
-│   ├── inception.py              # Modified InceptionV3 (128-channel input)
-│   ├── barlow_twins.py           # Self-supervised Barlow Twins implementation
-│   └── backbone.py               # ResNet-50 feature extractor
-│
-├── training/                      # Training pipelines
-│   ├── __init__.py               # Training module exports
-│   ├── ssl_trainer.py            # Barlow Twins pretraining, representation extraction
-│   └── supervised_trainer.py     # InceptionV3 supervised training, history logging
-│
-├── utils/                         # Helper utilities
-│   ├── __init__.py               # Utility exports
-│   ├── dataset_split.py          # Patient-level stratified splitting (prevents leakage)
-│   ├── metrics.py                # AUC, accuracy, precision, recall, F1-score
-│   └── visualization.py          # Training curves, confusion matrix, ROC plots
-│
-├── configs/                       # Configuration files
-│   └── config.yaml               # Hyperparameters, paths, training settings
-│
-├── scripts/                       # Executable training scripts
-│   └── train.py                  # Main training orchestration script
-│
-├── requirements.txt               # Python dependencies
-├── README.md                      # This file
-└── .gitignore                     # Git exclusions
