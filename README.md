@@ -33,7 +33,6 @@ The HPL paper uses SSL to discover unsupervised tissue phenotypes and applies lo
 
 The HPL paper introduced a fully unsupervised framework — **Histomorphological Phenotype Learning** — for discovering morphological patterns in WSIs without requiring expert annotations.
 
-[![HPL Methodology](images/hpl_overview.png)](images/hpl_overview.png)
 <img width="747" height="937" alt="image" src="https://github.com/user-attachments/assets/3540726b-bc64-45fc-be7e-2bd7f65a3bd4" />
 
 
