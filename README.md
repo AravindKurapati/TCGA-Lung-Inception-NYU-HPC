@@ -1,227 +1,142 @@
-# **TCGA Lung Cancer Classification using InceptionV3 on NYU HPC**
-
+# TCGA Lung Cancer Classification using InceptionV3 on NYU HPC
 
 ## Overview
 
-This repository implements and extends the methodology from the paper:  
-**"Mapping the landscape of histomorphological cancer phenotypes using self-supervised learning on unlabeled, unannotated pathology slides"** (Nature Cancer, 2023).  
-The core contribution of the paper is **Histomorphological Phenotype Learning (HPL)** — a self-supervised framework for discovering morphological patterns in whole slide images (WSIs) without requiring expert annotations.
+This repository implements a deep learning pipeline for classifying lung cancer subtypes — **LUAD (Lung Adenocarcinoma)** vs **LUSC (Lung Squamous Cell Carcinoma)** — from histopathology whole-slide images (WSIs) using a modified **InceptionV3** model trained on self-supervised embeddings, running on NYU's HPC cluster.
 
-This approach was applied to **lung adenocarcinoma (LUAD)** slides from TCGA to:
-- Uncover **meaningful tissue-level phenotypes**
-- **Cluster tile-level embeddings** into interpretable groups (HPCs)
-- **Correlate phenotypes** with survival, transcriptomic signatures, and cell-type distributions
+It builds upon the **Histomorphological Phenotype Learning (HPL)** framework introduced in:
 
----
+> Quiros et al., *"Mapping the landscape of histomorphological cancer phenotypes using self-supervised learning on unannotated pathology slides"*, Nature Communications, 2024.
 
-##  Objectives
-
-- Identify distinct **histomorphological patterns** (e.g., acinar, papillary, solid) via unsupervised learning  
-- Represent slides as **compositions of phenotypic clusters**  
-- Use cluster distributions to:
-  - Predict LUAD vs LUSC (Logistic Regression)
-  - Predict survival (Cox Regression)  
-- Ensure interpretability with SHAP explanations
-
-
+The HPL paper uses SSL to discover unsupervised tissue phenotypes and applies logistic regression for classification. **This work extends that pipeline by training a deep learning classifier (InceptionV3) directly on the SSL tile embeddings**, testing whether a neural network can outperform the cluster-based approach.
 
 ---
 
 ## Dataset
 
-- **TCGA Lung Adenocarcinoma (LUAD) and Lung Squamous Cell Carcinoma (LUSC)**  
-- **Whole Slide Images (WSIs)** with >400K tiles extracted  
-- Each tile: 224×224 patches sampled from high-resolution slides (20x or 40x)
+- **Source**: TCGA Lung Adenocarcinoma (LUAD) and Lung Squamous Cell Carcinoma (LUSC)
+- **Format**: Whole Slide Images (WSIs), tiled into 224×224 patches
+- **Tile Embeddings**: 128D vectors from a pretrained Barlow Twins SSL model
+- **Scale**:
+
+| Split      | Tiles   | Slides |
+|------------|---------|--------|
+| Train      | 537,474 | 628    |
+| Validation | 154,240 | 197    |
+| Test       | 149,265 | 197    |
+
+- Balanced label distribution across LUAD and LUSC (upsampling applied to minority class)
 
 ---
 
-##  HPL Methodology
+## HPL Background
 
-![image](https://github.com/user-attachments/assets/93e2fed5-95fb-494a-9ee2-b6d7fd26d134)
+The HPL paper introduced a fully unsupervised framework — **Histomorphological Phenotype Learning** — for discovering morphological patterns in WSIs without requiring expert annotations.
 
-### Step 1: WSI Preprocessing
-- WSIs split into **tiles** (~224×224 or 299×299)  
-- Background tiles removed based on tissue mask thresholds  
-- **Normalization** applied to correct staining variations
+[![HPL Methodology](images/hpl_overview.png)](images/hpl_overview.png)
 
-### Step 2: Self-Supervised Representation Learning
-- Used **Barlow Twins** to learn 128D embeddings per tile  
-- Trained without labels or annotations  
-- Captures structure, morphology, and texture
+### HPL Pipeline (Prior Work)
 
-### Step 3: Tile Clustering to Define HPCs
-- 200,000 tile embeddings sampled  
-- **UMAP** → dimensionality reduction  
-- **Leiden clustering** over KNN graph (K=250)  
-- Result: **46 clusters (HPCs)** of histomorphological patterns
+**Step 1 — WSI Preprocessing**: WSIs are split into 224×224 tiles. Background tiles are removed using tissue masks. Stain normalization corrects for lab-to-lab variation in H&E staining.
 
-### Step 4: Slide-Level Aggregation
-- For each slide, compute % of tiles assigned to each HPC  
-- Represent slides as a vector of HPC proportions (`w0, w1, ..., wC-1`)
+**Step 2 — Self-Supervised Representation Learning**: Barlow Twins is trained without labels on the full tile set, producing 128D embeddings per tile that capture morphological structure and texture.
+
+**Step 3 — Tile Clustering (HPCs)**: 200,000 tile embeddings are sampled, reduced with UMAP, and clustered via Leiden over a KNN graph (K=250). This produces **46 Histomorphological Phenotype Clusters (HPCs)**, each representing a distinct tissue pattern.
+
+**Step 4 — Slide-Level Aggregation**: Each slide is represented as a vector of HPC proportions — what percentage of its tiles fall into each cluster.
+
+**Step 5 — Downstream Tasks**: Logistic Regression on HPC proportion vectors achieves AUC = **0.93** (TCGA) and **0.99** (NYU) for LUAD vs LUSC classification.
 
 ---
 
-## Downstream Tasks
+## My Contribution: InceptionV3 Classifier on SSL Embeddings
 
-### 🔹 LUAD vs LUSC Classification
-- Logistic Regression using HPC proportion vectors as input  
-- **TCGA 5-fold CV**: AUC = **0.93**  
-- **NYU cohort**: AUC = **0.99**
+Rather than using cluster proportions as slide-level features, this project feeds the raw 128D tile embeddings directly into a modified InceptionV3 model, treating each slide as a (224×224×128) tensor.
 
-###  Survival Prediction (OS, RFS)
-- **Cox Proportional Hazards model** with HPC proportions  
-- TCGA C-index = **0.60**, NYU1 = **0.65**
-- HPCs enriched with lymphocyte infiltration → better prognosis
+### Methodology
 
----
-
-##  Interpretability
-
-- Used **SHAP values** to measure HPC impact on predictions  
-- Visualized positive and negative contributors to hazard ratios and class probabilities  
-- Linked clusters to known histological types and immune signatures
-
----
-
-##  Biological Interpretations
-
-- HPCs matched known LUAD morphologies (e.g., acinar, papillary, lepidic)  
-- Positive survival indicators:  
-  - High lymphocyte presence  
-  - Inflammatory cell signatures (TILs, macrophages)  
-- Negative survival indicators:  
-  - Proliferation markers  
-  - Solid tumor growth  
-  - Sparse immune infiltration
-
----
-
-## Citation
-
-
-@article{QuirosCoudray2024,
-	author = {Claudio Quiros, Adalberto and Coudray, Nicolas and Yeaton, Anna and Yang, Xinyu and Liu, Bojing and Le, Hortense and Chiriboga, Luis and Karimkhan, Afreen and Narula, Navneet and Moore, David A. and Park, Christopher Y. and Pass, Harvey and Moreira, Andre L. and Le Quesne, John and Tsirigos, Aristotelis and Yuan, Ke},
-	journal = {Nature Communications},
-	number = {1},
-	pages = {4596},
-	title = {Mapping the landscape of histomorphological cancer phenotypes using self-supervised learning on unannotated pathology slides},
-	volume = {15},
-	year = {2024}}
-}
-
-
-
-
-# How I used the SSL Embeddings and InceptionV3
-
-I implemented a deep learning pipeline for classifying lung cancer subtypes — **LUAD (Lung Adenocarcinoma)** vs. **LUSC (Lung Squamous Cell Carcinoma)** — from histopathology whole-slide images (WSIs) using **InceptionV3** on **NYU's HPC cluster**. It builds upon prior work that used self-supervised learning (SSL) to extract tile-level embeddings.
-
----
-
-## Project Objective
-
-Extend the HPL pipeline by building a **deep learning model** to directly classify slide-level embeddings into LUAD or LUSC using a modified **InceptionV3** model.
-
----
-
-## Dataset Overview
-
-- Source: **TCGA LUAD and LUSC datasets**
-- Format: Preprocessed tiles in HDF5 format
-- Tile Embeddings: **128D vectors** from pretrained **Barlow Twins** SSL model
-- Total:
-  - **Train Tiles**: 537,474 → 628 slides
-  - **Validation Tiles**: 154,240 → 197 slides
-  - **Test Tiles**: 149,265 → 197 slides
-- Balanced label distribution across LUAD and LUSC
-
----
-
-## 🔧 Methodology
-
-### Tile Aggregation
+#### Tile Aggregation
 - Tiles grouped by slide ID
-- Reconstructed into **(224 × 224 × 128)** tensors
-- Treated as "images" for CNN input
+- Reconstructed into **(224 × 224 × 128)** tensors treating embedding dimensions as channels
+- These tensors are the input to the CNN
 
-### InceptionV3 Model (Modified)
-- `input_shape=(224, 224, 128)`
-- Removed top classification layer (`include_top=False`)
-- Added:
-  - `GlobalAveragePooling2D`
-  - `Dense(512, ReLU)`
-  - `Dropout(0.5)`
-  - `Dense(1, Sigmoid)`
-- `weights=None` (not using ImageNet due to 128 channels)
+#### InceptionV3 Architecture (Modified)
 
-### Training Setup
-| Parameter        | Value                     |
-|------------------|---------------------------|
-| Optimizer        | SGD with momentum (0.9)   |
-| Learning Rate    | 0.01                      |
-| Nesterov         | True                      |
-| Loss Function    | Binary Crossentropy       |
-| Evaluation       | Accuracy, AUC             |
-| Hardware         | NYU HPC (multi-GPU setup) |
+| Layer | Config |
+|-------|--------|
+| Input shape | (224, 224, 128) |
+| Base | InceptionV3, `include_top=False`, `weights=None` |
+| Pooling | GlobalAveragePooling2D |
+| Dense | 512 units, ReLU |
+| Regularization | Dropout(0.5) |
+| Output | Dense(1, Sigmoid) |
+
+> `weights=None` — ImageNet pretraining not used because input has 128 channels, not 3.
+
+#### Training Setup
+
+| Parameter | Value |
+|-----------|-------|
+| Optimizer | SGD with momentum (0.9), Nesterov |
+| Learning Rate | 0.01 |
+| Loss | Binary Crossentropy |
+| Evaluation | Accuracy, AUC |
+| Hardware | NYU HPC, multi-GPU |
 
 ---
 
 ## Results
 
-| Metric   | Value        |
-|----------|--------------|
-| Accuracy | ~78%         |
-| AUC      | ~0.65        |
+| Metric   | This Work (InceptionV3) | HPL Baseline (Logistic Regression) |
+|----------|------------------------|--------------------------------------|
+| Accuracy | ~78%                   | —                                    |
+| AUC      | ~0.65                  | 0.93 (TCGA), 0.99 (NYU)             |
 
-Model performance shows reasonable classification accuracy but limited discriminative power (lower AUC), possibly due to compactness of SSL embeddings and limited interpretability.
-
----
-
-## Comparison with HPL Pipeline
-
-| Aspect                | HPL (Prior Work)                          | This Work (Current)                      |
-|-----------------------|-------------------------------------------|------------------------------------------|
-| Tile Processing       | SSL + Leiden Clustering → HPCs           | SSL embeddings → CNN input (InceptionV3) |
-| Classification        | Logistic Regression on HPC proportions   | InceptionV3 Deep Learning Model          |
-| Interpretability      | High (via SHAP, pathology-labeled HPCs)  | Low (CNN is a black box)                 |
-| Performance (AUC)     | 0.93 (TCGA), 0.99 (NYU)                   | ~0.65                                     |
-
----
-
-## Learnings
-
-- SSL embeddings offer dimensional efficiency but may lose visual details.
-- Deep models struggle without RGB or spatial patterns.
-- End-to-end fine-tuning might improve accuracy.
-- Interpretability is harder in CNNs compared to cluster-based models.
-
----
-
-## Future Directions
-
-- Add **attention or MIL-based aggregation** methods
-- Fine-tune SSL + classifier jointly (end-to-end)
-- Integrate **multi-modal features** (genomics, clinical)
+The simpler cluster-based approach outperforms the deep model. The HPL pipeline uses structured, biology-grounded HPC proportion vectors as features, while InceptionV3 trains from scratch with no inductive bias suited to embedding tensors. End-to-end fine-tuning of the SSL backbone together with the classifier would likely close this gap.
 
 ---
 
 ## Visual Examples
 
-![transformed_1](https://github.com/user-attachments/assets/d94675b9-2972-46f0-8011-9d070ffe1d2c)
+**Tissue mask and patch extraction:**
 
+[![Tissue Mask](images/TCGA-33-4532-01Z-00-DX1_mask.png)](images/TCGA-33-4532-01Z-00-DX1_mask.png)
 
-![image](https://github.com/user-attachments/assets/78159674-d593-4560-a988-06878975ae30)
+**Example cluster tiles (Cluster 13):**
 
+[![Cluster 13](images/cluster_13_train.jpg)](images/cluster_13_train.jpg)
 
-![image](https://github.com/user-attachments/assets/a48cb556-8a26-4b04-b3e6-8e89c2f079e2)
+**Transformed input tiles:**
 
-![image](https://github.com/user-attachments/assets/c73b1e1a-ff37-4650-b525-be5b674652b3)
+[![Transformed tile](images/transformed_1.png)](images/transformed_1.png)
 
+---
 
-![TCGA-33-4532-01Z-00-DX1_mask](https://github.com/user-attachments/assets/5659c94e-e475-46b0-8d15-e18e501f89af)
+## Learnings
 
+- SSL embeddings encode rich morphological information but lose the spatial structure that CNNs are designed to exploit — explaining the lower AUC vs logistic regression on HPC proportions
+- Class imbalance at the tile level significantly affects convergence; upsampling the minority class was necessary for stable training
+- HDF5-based tile storage was essential for I/O efficiency at 850K+ tile scale
+- SLURM job scripting on shared HPC infrastructure requires careful memory and GPU allocation to avoid preemption
 
-![cluster_13_train](https://github.com/user-attachments/assets/4f03045c-a59c-47ee-8a7e-1ecba9514724)
+## Future Directions
 
+- Add attention-based or MIL aggregation methods for slide-level representation
+- Fine-tune SSL backbone and classifier jointly (end-to-end)
+- Integrate multimodal features (genomics, RNA-seq, clinical metadata)
 
+---
 
+## Citation
+
+```bibtex
+@article{QuirosCoudray2024,
+  author  = {Claudio Quiros, Adalberto and Coudray, Nicolas and Yeaton, Anna and Yang, Xinyu and Liu, Bojing and Le, Hortense and Chiriboga, Luis and Karimkhan, Afreen and Narula, Navneet and Moore, David A. and Park, Christopher Y. and Pass, Harvey and Moreira, Andre L. and Le Quesne, John and Tsirigos, Aristotelis and Yuan, Ke},
+  journal = {Nature Communications},
+  number  = {1},
+  pages   = {4596},
+  title   = {Mapping the landscape of histomorphological cancer phenotypes using self-supervised learning on unannotated pathology slides},
+  volume  = {15},
+  year    = {2024}
+}
+```
