@@ -27,7 +27,7 @@ The key difference: the HPL paper discovers unsupervised tissue phenotypes via c
 
 ## HPL Methodology (Prior Work)
 
-[![HPL Methodology](images/hpl_overview.png)](images/hpl_overview.png)
+<img width="747" height="937" alt="image" src="https://github.com/user-attachments/assets/4abffc5d-fd68-426d-a59d-2f3f43d0c259" />
 
 The HPL framework operates fully without labels. Below is the pipeline this work reproduces and builds upon.
 
