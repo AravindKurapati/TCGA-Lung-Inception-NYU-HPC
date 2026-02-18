@@ -8,6 +8,8 @@ It builds upon the **Histomorphological Phenotype Learning (HPL)** framework int
 
 > Quiros et al., *"Mapping the landscape of histomorphological cancer phenotypes using self-supervised learning on unannotated pathology slides"*, Nature Communications, 2024.
 
+https://www.nature.com/articles/s41467-024-48666-7
+
 The HPL paper uses SSL to discover unsupervised tissue phenotypes and applies logistic regression for classification. **This work extends that pipeline by training a deep learning classifier (InceptionV3) directly on the SSL tile embeddings**, testing whether a neural network can outperform the cluster-based approach.
 
 ---
