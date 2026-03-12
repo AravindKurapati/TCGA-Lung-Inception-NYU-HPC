@@ -1,8 +1,20 @@
 # TCGA Lung Cancer Classification using InceptionV3 on NYU HPC
 
+Built as part of my MS CS work at NYU, running on NYU's HPC cluster.
+
+I got really into computational pathology during my time at NYU Langone. This repo extends that direction.
+I took the HPL framework (a really cool SSL-based approach for histopathology) 
+
+Spoiler: InceptionV3 gets to ~78% accuracy but struggles on AUC (~0.65) and honestly that gap 
+tells an interesting story about what SSL embeddings do and don't preserve. The "Learnings" section 
+below gets into it.
+
+This was also my first time wrangling multi GPU jobs on an HPC cluster, which was its own adventure.
+
+
 ## Overview
 
-This repository implements a deep learning pipeline for classifying lung cancer subtypes — **LUAD (Lung Adenocarcinoma)** vs **LUSC (Lung Squamous Cell Carcinoma)** — from histopathology whole-slide images (WSIs) using a modified **InceptionV3** model trained on self-supervised tile embeddings, running on NYU's HPC cluster.
+This repository implements a deep learning pipeline for classifying lung cancer subtypes - **LUAD (Lung Adenocarcinoma)** vs **LUSC (Lung Squamous Cell Carcinoma)**  from histopathology whole-slide images (WSIs) using a modified **InceptionV3** model trained on self-supervised tile embeddings, running on NYU's HPC cluster.
 
 It builds upon the **Histomorphological Phenotype Learning (HPL)** framework introduced in:
 
