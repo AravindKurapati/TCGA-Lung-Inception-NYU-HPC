@@ -123,7 +123,7 @@ Rather than using HPC proportion vectors as slide features, this project feeds t
 | Classifier | Logistic Regression | InceptionV3 |
 | Interpretability | High (SHAP + pathology-labeled HPCs) | Low (CNN black box) |
 | AUC | 0.93 (TCGA), 0.99 (NYU) | ~0.65 |
-| Accuracy | — | ~78% |
+| Accuracy | 99% | ~78% |
 
 The simpler cluster-based approach outperforms the deep model. The HPL pipeline uses structured, biology-grounded features that logistic regression can exploit cleanly. InceptionV3 trains from scratch here on embedding tensors that don't carry the spatial structure CNNs are designed to exploit and without ImageNet pretraining there is no useful weight initialization. End-to-end fine tuning of the SSL backbone together with the classifier, rather than using frozen embeddings would likely close this gap significantly.
 
